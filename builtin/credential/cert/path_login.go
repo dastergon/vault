@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 
+	"github.com/hashicorp/go-sockaddr"
 	"github.com/ryanuber/go-glob"
 )
 
@@ -150,6 +151,26 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, d *f
 	if cert == nil {
 		// User no longer exists, do not renew
 		return nil, nil
+	}
+
+	if len(cert.BoundCIDRs) > 0 {
+		var valid bool
+		remoteSockAddr, err := sockaddr.NewSockAddr(req.Connection.RemoteAddr)
+		if err != nil {
+			if b.Logger().IsDebug() {
+				b.Logger().Debug("could not parse remote addr into sockaddr", "error", err, "remote_addr", req.Connection.RemoteAddr)
+			}
+			return nil, logical.ErrPermissionDenied
+		}
+		for _, cidr := range cert.BoundCIDRs {
+			if cidr.Contains(remoteSockAddr) {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, logical.ErrPermissionDenied
+		}
 	}
 
 	if !policyutil.EquivalentPolicies(cert.Policies, req.Auth.Policies) {

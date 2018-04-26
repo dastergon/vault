@@ -17,6 +17,11 @@ func pathConfig(b *backend) *framework.Path {
 				Default:     false,
 				Description: `If set, during renewal, skips the matching of presented client identity with the client identity used during login. Defaults to false.`,
 			},
+			"bound_cidr_list": &framework.FieldSchema{
+				Type: framework.TypeCommaStringSlice,
+				Description: `Comma separated string or list of CIDR blocks. If set, specifies the blocks of
+IP addresses which can perform the login operation.`,
+			},
 		},
 
 		Callbacks: map[logical.Operation]framework.OperationFunc{
@@ -26,11 +31,11 @@ func pathConfig(b *backend) *framework.Path {
 }
 
 func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	disableBinding := data.Get("disable_binding").(bool)
+	c := config{
+		DisableBinding: data.Get("disable_binding").(bool),
+	}
 
-	entry, err := logical.StorageEntryJSON("config", config{
-		DisableBinding: disableBinding,
-	})
+	entry, err := logical.StorageEntryJSON("config", c)
 	if err != nil {
 		return nil, err
 	}
